@@ -32,6 +32,7 @@ import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { ITextBufferFactory } from 'vs/editor/common/model';
 import { IHashService } from 'vs/workbench/services/hash/common/hashService';
+import { createTextBufferFactoryFromSnapshot } from 'vs/editor/common/model/textModel';
 
 /**
  * The text file editor model listens to changes to its underlying code editor model and saves these changes through the file service back to the disk.
@@ -488,13 +489,15 @@ export class TextFileEditorModel extends BaseTextEditorModel implements ITextFil
 		this.toDispose.push(this.textEditorModel.onDidChangeContent(() => this.onModelContentChanged()));
 	}
 
-	private doLoadBackup(backup: URI): TPromise<string> {
+	private doLoadBackup(backup: URI): TPromise<ITextBufferFactory> {
 		if (!backup) {
 			return TPromise.as(null);
 		}
 
-		return this.textFileService.resolveTextContent(backup, BACKUP_FILE_RESOLVE_OPTIONS).then(backup => {
-			return this.backupFileService.parseBackupContent(backup.value);
+		return this.fileService.resolveStreamContent(backup, BACKUP_FILE_RESOLVE_OPTIONS).then(backup => {
+			return this.backupFileService.parseBackupContent(backup.value).then(backupSnapshot => {
+				return createTextBufferFactoryFromSnapshot(backupSnapshot);
+			});
 		}, error => null /* ignore errors */);
 	}
 

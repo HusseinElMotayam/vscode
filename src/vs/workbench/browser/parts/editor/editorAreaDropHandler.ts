@@ -36,7 +36,7 @@ export class EditorAreaDropHandler {
 		@IBackupFileService private backupFileService: IBackupFileService,
 		@IEditorGroupService private groupService: IEditorGroupService,
 		@IUntitledEditorService private untitledEditorService: IUntitledEditorService,
-		@IWorkbenchEditorService private editorService: IWorkbenchEditorService,
+		@IWorkbenchEditorService private editorService: IWorkbenchEditorService
 	) {
 	}
 
@@ -107,10 +107,12 @@ export class EditorAreaDropHandler {
 		}
 
 		// Resolve the contents of the dropped dirty resource from source
-		return this.textFileService.resolveTextContent(droppedDirtyEditor.backupResource, BACKUP_FILE_RESOLVE_OPTIONS).then(content => {
+		return this.fileService.resolveStreamContent(droppedDirtyEditor.backupResource, BACKUP_FILE_RESOLVE_OPTIONS).then(content => {
+			return this.backupFileService.parseBackupContent(content.value).then(snapshot => {
 
-			// Set the contents of to the resource to the target
-			return this.backupFileService.backupResource(droppedDirtyEditor.resource, this.backupFileService.parseBackupContent(content.value));
+				// Set the contents of to the resource to the target
+				return this.backupFileService.backupResource(droppedDirtyEditor.resource, snapshot);
+			});
 		}).then(() => false, () => false /* ignore any error */);
 	}
 

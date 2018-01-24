@@ -8,8 +8,7 @@
 import Uri from 'vs/base/common/uri';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { TPromise } from 'vs/base/common/winjs.base';
-import { IResolveContentOptions, IUpdateContentOptions, ITextSnapshot } from 'vs/platform/files/common/files';
-import { ITextBufferFactory } from 'vs/editor/common/model';
+import { IResolveContentOptions, IUpdateContentOptions, ITextSnapshot, IStringStream } from 'vs/platform/files/common/files';
 
 export const IBackupFileService = createDecorator<IBackupFileService>('backupFileService');
 
@@ -68,10 +67,10 @@ export interface IBackupFileService {
 	 * Parses backup raw text content into the content, removing the metadata that is also stored
 	 * in the file.
 	 *
-	 * @param textBufferFactory The ITextBufferFactory from a backup resource.
-	 * @return The backup file's backed up content.
+	 * @param value The contents from a backup resource as stream.
+	 * @return The backup file's backed up content as snapshot.
 	 */
-	parseBackupContent(textBufferFactory: ITextBufferFactory): string;
+	parseBackupContent(value: IStringStream): TPromise<ITextSnapshot>;
 
 	/**
 	 * Discards the backup associated with a resource if it exists..

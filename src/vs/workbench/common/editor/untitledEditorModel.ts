@@ -10,15 +10,16 @@ import { IEncodingSupport } from 'vs/workbench/common/editor';
 import { BaseTextEditorModel } from 'vs/workbench/common/editor/textEditorModel';
 import URI from 'vs/base/common/uri';
 import { PLAINTEXT_MODE_ID } from 'vs/editor/common/modes/modesRegistry';
-import { CONTENT_CHANGE_EVENT_BUFFER_DELAY } from 'vs/platform/files/common/files';
+import { CONTENT_CHANGE_EVENT_BUFFER_DELAY, IFileService } from 'vs/platform/files/common/files';
 import { IModeService } from 'vs/editor/common/services/modeService';
 import { IModelService } from 'vs/editor/common/services/modelService';
 import { IMode } from 'vs/editor/common/modes';
 import Event, { Emitter } from 'vs/base/common/event';
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { IBackupFileService, BACKUP_FILE_RESOLVE_OPTIONS } from 'vs/workbench/services/backup/common/backup';
-import { ITextFileService } from 'vs/workbench/services/textfile/common/textfiles';
 import { ITextResourceConfigurationService } from 'vs/editor/common/services/resourceConfiguration';
+import { ITextBufferFactory } from 'vs/editor/common/model';
+import { createTextBufferFactoryFromSnapshot, createTextBufferFactory } from 'vs/editor/common/model/textModel';
 
 export class UntitledEditorModel extends BaseTextEditorModel implements IEncodingSupport {
 
@@ -46,7 +47,7 @@ export class UntitledEditorModel extends BaseTextEditorModel implements IEncodin
 		@IModeService modeService: IModeService,
 		@IModelService modelService: IModelService,
 		@IBackupFileService private backupFileService: IBackupFileService,
-		@ITextFileService private textFileService: ITextFileService,
+		@IFileService private fileService: IFileService,
 		@ITextResourceConfigurationService private configurationService: ITextResourceConfigurationService
 	) {
 		super(modelService, modeService);
@@ -163,18 +164,25 @@ export class UntitledEditorModel extends BaseTextEditorModel implements IEncodin
 		// Check for backups first
 		return this.backupFileService.loadBackupResource(this.resource).then(backupResource => {
 			if (backupResource) {
-				return this.textFileService.resolveTextContent(backupResource, BACKUP_FILE_RESOLVE_OPTIONS).then(rawTextContent => {
+				return this.fileService.resolveStreamContent(backupResource, BACKUP_FILE_RESOLVE_OPTIONS).then(rawTextContent => {
 					return this.backupFileService.parseBackupContent(rawTextContent.value);
 				});
 			}
 
 			return null;
-		}).then(backupContent => {
+		}).then(snapshot => {
 
 			// untitled associated to file path are dirty right away as well as untitled with content
-			this.setDirty(this.hasAssociatedFilePath || !!backupContent);
+			this.setDirty(this.hasAssociatedFilePath || !!snapshot);
 
-			return this.doLoad(backupContent || this.initialValue || '').then(model => {
+			let contentBufferFactory: ITextBufferFactory;
+			if (snapshot) {
+				contentBufferFactory = createTextBufferFactoryFromSnapshot(snapshot);
+			} else {
+				contentBufferFactory = createTextBufferFactory(this.initialValue || '');
+			}
+
+			return this.doLoad(contentBufferFactory).then(model => {
 				// Encoding
 				this.configuredEncoding = this.configurationService.getValue<string>(this.resource, 'files.encoding');
 
@@ -189,7 +197,7 @@ export class UntitledEditorModel extends BaseTextEditorModel implements IEncodin
 		});
 	}
 
-	private doLoad(content: string): TPromise<UntitledEditorModel> {
+	private doLoad(content: ITextBufferFactory): TPromise<UntitledEditorModel> {
 
 		// Create text editor model if not yet done
 		if (!this.textEditorModel) {
